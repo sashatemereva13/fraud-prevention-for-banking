@@ -1,0 +1,61 @@
+# =====================
+# ENV FILES
+# =====================
+.env
+.env.*
+!.env.example
+
+# =====================
+# PYTHON
+# =====================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env_venv/
+.venv/
+
+# =====================
+# TESTING
+# =====================
+.coverage
+htmlcov/
+.pytest_cache/
+
+# =====================
+# IDE / SYSTEM
+# =====================
+.vscode/
+.idea/
+.DS_Store
+
+# =====================
+# LOGS / TEMP
+# =====================
+logs/
+*.log
+tmp/
+*.tmp
+
+# =====================
+# DOCKER
+# =====================
+docker-compose.override.yml
+
+# =====================
+# DATABASE / DATA
+# =====================
+data/
+dump/
+neo4j/data/
+
+# =====================
+# SECRETS
+# =====================
+*.key
+*.pem
+*.crt
+*.p12
