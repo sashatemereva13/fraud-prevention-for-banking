@@ -45,3 +45,36 @@ def check_new_device(user_id: str, device: str) -> bool:
     redis_client.sadd(key, device)
 
     return is_new
+
+
+
+def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -> bool:
+    """
+    detects suspicious location changes in a short time.
+
+    uses Redis:
+    - user:{user_id}:last_location
+    - user:{user_id}:last_tx_time
+    """
+
+    loc_key = f"user:{user_id}:last_location"
+    time_key = f"user:{user_id}:last_tx_time"
+
+    last_location = redis_client.get(loc_key)
+    last_time = redis_client.get(time_key)
+
+    now = time.time()
+
+    anomaly = False
+
+    if last_location and last_time:
+        last_time = float(last_time)
+
+        if location != last_location and (now - last_time < time_threshold):
+            anomaly = True
+
+    # update state
+    redis_client.set(loc_key, location)
+    redis_client.set(time_key, now)
+
+    return anomaly
