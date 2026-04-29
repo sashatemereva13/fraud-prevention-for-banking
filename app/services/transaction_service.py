@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 
 from app.db.mongo import transactions_collection
 from app.models.transactions import Transaction
+from app.services.alert_service import create_alert
 
 
 # CREATE TRANSACTION
@@ -27,26 +28,22 @@ def suspicious_transaction_frequency():
     one_minute_ago = datetime.now(timezone.utc) - timedelta(minutes=1)
 
     pipeline = [
-        {
-            "$match": {
-                "timestamp": {"$gte": one_minute_ago}
-            }
-        },
-        {
-            "$group": {
-                "_id": "$user_id",
-                "transaction_count": {"$sum": 1}
-            }
-        },
-        {
-            "$match": {
-                "transaction_count": {"$gt": 5}
-            }
-        }
+        {"$match": {"timestamp": {"$gte": one_minute_ago}}},
+        {"$group": {"_id": "$user_id", "transaction_count": {"$sum": 1}}},
+        {"$match": {"transaction_count": {"$gt": 5}}}
     ]
 
-    return list(transactions_collection.aggregate(pipeline))
+    results = list(transactions_collection.aggregate(pipeline))
 
+    for r in results:
+        create_alert(
+            user_id=r["_id"],
+            alert_type="HIGH_FREQUENCY",
+            message="User made too many transactions in a short time",
+            severity="HIGH"
+        )
+
+    return results
 
 # AGGREGATION 2:
 # Daily spending analysis
