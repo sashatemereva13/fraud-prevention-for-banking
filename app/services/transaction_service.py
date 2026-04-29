@@ -1,20 +1,19 @@
 from datetime import datetime, timezone, timedelta
 
 from app.db.mongo import transactions_collection
+from app.models.transactions import Transaction
 
 
-# 1. CREATE TRANSACTION
+# CREATE TRANSACTION
 def create_transaction(data):
-    transaction = {
-        "user_id": data["user_id"],
-        "amount": data["amount"],
-        "location": data["location"],
-        "device_id": data["device_id"],
-        "timestamp": datetime.now(timezone.utc),
-        "is_fraud": False
-    }
+    transaction = Transaction(
+        user_id=data["user_id"],
+        amount=data["amount"],
+        location=data["location"],
+        device_id=data["device_id"]
+    )
 
-    result = transactions_collection.insert_one(transaction)
+    result = transactions_collection.insert_one(transaction.to_dict())
 
     return {
         "message": "Transaction created successfully",
@@ -22,7 +21,8 @@ def create_transaction(data):
     }
 
 
-# 2. FRAUD: HIGH FREQUENCY
+# AGGREGATION 1:
+# Suspicious transaction frequency
 def suspicious_transaction_frequency():
     one_minute_ago = datetime.now(timezone.utc) - timedelta(minutes=1)
 
@@ -48,8 +48,8 @@ def suspicious_transaction_frequency():
     return list(transactions_collection.aggregate(pipeline))
 
 
-
-# 3. ANALYTICS: DAILY SPENDING
+# AGGREGATION 2:
+# Daily spending analysis
 def daily_spending_analysis():
     pipeline = [
         {
@@ -73,3 +73,13 @@ def daily_spending_analysis():
     ]
 
     return list(transactions_collection.aggregate(pipeline))
+
+
+# Get user history
+def get_user_transactions(user_id):
+    return list(
+        transactions_collection.find(
+            {"user_id": user_id},
+            {"_id": 0}
+        )
+    )
