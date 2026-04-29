@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from app.api.routes.transactions import router as transactions_router
 from app.api.routes.alerts import router as alerts_router
-
+from app.api.routes.users import router as users_router
 
 
 app = FastAPI(
@@ -13,7 +13,7 @@ app = FastAPI(
 # Register Routes
 app.include_router(transactions_router)
 app.include_router(alerts_router)
-
+app.include_router(users_router)
 
 # Health Check
 @app.get("/")

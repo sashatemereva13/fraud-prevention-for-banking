@@ -1,2 +1,7 @@
-pymongo
 fastapi
+uvicorn
+pymongo
+redis
+neo4j
+pydantic[email]
+email-validator
