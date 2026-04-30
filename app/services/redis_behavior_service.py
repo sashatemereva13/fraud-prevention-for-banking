@@ -8,7 +8,8 @@ import uuid
 RISK_WEIGHTS = {
     "velocity": 50,
     "new_device": 30,
-    "geo_anomaly": 40
+    "geo_anomaly": 40,
+    "cooldown_violation": 20,
 }
 
 SUSPICIOUS_THRESHOLD = 60
@@ -108,6 +109,26 @@ def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -
 
     return anomaly
 
+
+
+# =============================
+# COOLDOWN SIGNAL
+# =============================
+def check_cooldown(user_id: str, cooldown_seconds: int = 10) -> bool:
+    """
+    Prevents rapid repeated actions (rate limiting).
+    If user acts too quickly -> flagged.
+    """
+
+    key = f"user:{user_id}:cooldown"
+
+    if redis_client.exists(key):
+        return True
+    
+    redis_client.setex(key, cooldown_seconds, 1)
+
+    return False
+
 # ==============================
 # RISK COMPUTATION
 # ==============================
@@ -130,6 +151,10 @@ def compute_risk(user_id: str, device: str, location: str) -> dict:
         score += RISK_WEIGHTS["geo_anomaly"]
         reasons.append("geo_anomaly")
 
+    if check_cooldown(user_id):
+        score += RISK_WEIGHTS["cooldown_violation"]
+        reasons.append("cooldown_violation")
+
 
     result = {
         "risk_score": score,
@@ -140,3 +165,5 @@ def compute_risk(user_id: str, device: str, location: str) -> dict:
     print(f"[RISK] user={user_id}, score={score}, reasons={reasons}")
 
     return result
+
+
