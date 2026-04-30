@@ -1,7 +1,10 @@
 fastapi
 uvicorn
+
 pydantic
+pydantic[email]
 pydantic-settings
+email-validator
 
 pymongo
 redis
