@@ -2,6 +2,22 @@ import time
 from app.db.redis_client import redis_client
 import uuid
 
+# ============================
+# CONFIGURATION
+# ============================
+RISK_WEIGHTS = {
+    "velocity": 50,
+    "new_device": 30,
+    "geo_anomaly": 40
+}
+
+SUSPICIOUS_THRESHOLD = 60
+
+
+# ==========================
+# VELOCITY CHECK
+# ==========================
+
 def check_velocity(user_id: str, transaction_id: str, window_seconds: int = 60, max_tx: int = 5) -> bool:
     """
     detects if a user performs too many transctions
@@ -31,7 +47,9 @@ def check_velocity(user_id: str, transaction_id: str, window_seconds: int = 60, 
     return tx_count > max_tx
 
 
-
+# =================================
+# NEW DEVICE CHECK
+# =================================
 def check_new_device(user_id: str, device: str) -> bool:
     """
     Detects if the user's device is new
@@ -53,7 +71,9 @@ def check_new_device(user_id: str, device: str) -> bool:
     return is_new
 
 
-
+# =========================
+# GEO ANOMALY CHECK
+# =========================
 def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -> bool:
     """
     detects suspicious location changes in a short time.
@@ -70,8 +90,11 @@ def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -
     last_time = redis_client.get(time_key)
 
     now = time.time()
-
     anomaly = False
+    
+    # decode bytes -> string
+    if last_location:
+        last_location = last_location.decode()
 
     if last_location and last_time:
         last_time = float(last_time)
@@ -83,32 +106,37 @@ def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -
     redis_client.setex(loc_key, time_threshold, location)
     redis_client.setex(time_key, time_threshold, now)
 
-
     return anomaly
 
-
+# ==============================
+# RISK COMPUTATION
+# ==============================
 def compute_risk(user_id: str, device: str, location: str) -> dict:
     score = 0
     reasons = []
-    
+
     # temporary unique id
     transaction_id = str(uuid.uuid4())
 
     if check_velocity(user_id, transaction_id):
-        score += 50
+        score += RISK_WEIGHTS["velocity"]
         reasons.append("high_velocity")
 
     if check_new_device(user_id, device):
-        score += 30
+        score += RISK_WEIGHTS["new_device"]
         reasons.append("new_device")
 
     if check_geo_anomaly(user_id, location):
-        score += 40
+        score += RISK_WEIGHTS["geo_anomaly"]
         reasons.append("geo_anomaly")
 
-    
-    return {
+
+    result = {
         "risk_score": score,
         "reasons": reasons,
-        "is_suspicious": score >= 60
+        "is_suspicious": score >= SUSPICIOUS_THRESHOLD
     }
+    
+    print(f"[RISK] user={user_id}, score={score}, reasons={reasons}")
+
+    return result
