@@ -20,6 +20,7 @@ def check_velocity(user_id: str, transaction_id: str, window_seconds: int = 60, 
 
     # remove transactions outside the time frame
     redis_client.zremrangebyscore(key, 0, now - window_seconds)
+    redis_client.expire(key, window_seconds)
 
     # count remaining tranactions
     tx_count = redis_client.zcard(key)
@@ -43,6 +44,9 @@ def check_new_device(user_id: str, device: str) -> bool:
 
     # store device for future reference
     redis_client.sadd(key, device)
+
+    # expire in 30 days
+    redis_client.expire(key, 60 * 60 * 24 * 30)
 
     return is_new
 
@@ -73,8 +77,9 @@ def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -
         if location != last_location and (now - last_time < time_threshold):
             anomaly = True
 
-    # update state
-    redis_client.set(loc_key, location)
-    redis_client.set(time_key, now)
+    # update state and expire
+    redis_client.setex(loc_key, time_threshold, location)
+    redis_client.setex(time_key, time_threshold, now)
+
 
     return anomaly
