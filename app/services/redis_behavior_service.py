@@ -1,9 +1,10 @@
 import time
 from app.db.redis_client import redis_client
+import uuid
 
 def check_velocity(user_id: str, transaction_id: str, window_seconds: int = 60, max_tx: int = 5) -> bool:
     """
-    detecs if a user performs too many transctions
+    detects if a user performs too many transctions
     in a short time frame (window).
 
     uses redis sorted sets:
@@ -86,3 +87,28 @@ def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -
     return anomaly
 
 
+def compute_risk(user_id: str, device: str, location: str) -> dict:
+    score = 0
+    reasons = []
+    
+    # temporary unique id
+    transaction_id = str(uuid.uuid4())
+
+    if check_velocity(user_id, transaction_id):
+        score += 50
+        reasons.append("high_velocity")
+
+    if check_new_device(user_id, device):
+        score += 30
+        reasons.append("new_device")
+
+    if check_geo_anomaly(user_id, location):
+        score += 40
+        reasons.append("geo_anomaly")
+
+    
+    return {
+        "risk_score": score,
+        "reasons": reasons,
+        "is_suspicious": score >= 60
+    }
