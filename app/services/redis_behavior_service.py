@@ -19,12 +19,12 @@ def check_velocity(user_id: str, transaction_id: str, window_seconds: int = 60, 
 
     # queue commands
     pipe.zadd(key, {transaction_id: now})
-    pipe.zremrangebyscrore(key, 0, now - window_seconds)
+    pipe.zremrangebyscore(key, 0, now - window_seconds)
     pipe.zcard(key)
     pipe.expire(key, window_seconds)
 
     # count remaining tranactions
-    _, _, tx_count = pipe.execute()
+    _, _, tx_count, _ = pipe.execute()
 
     # return anomaly
     return tx_count > max_tx
@@ -84,3 +84,5 @@ def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -
 
 
     return anomaly
+
+
