@@ -12,7 +12,7 @@ router = APIRouter()
 # CREATE USER
 @router.post("/users")
 def add_user(user: UserCreate):
-    return create_user(user.dict())
+    return create_user(user.model_dump())
 
 # GET ALL USERS
 @router.get("/users")
