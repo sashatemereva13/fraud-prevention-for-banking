@@ -15,15 +15,16 @@ def check_velocity(user_id: str, transaction_id: str, window_seconds: int = 60, 
     key = f"user:{user_id}:recent_txs"
     now = time.time()
 
-    # add transaction with timestamp
-    redis_client.zadd(key, {transaction_id: now})
+    pipe = redis_client.pipeline()
 
-    # remove transactions outside the time frame
-    redis_client.zremrangebyscore(key, 0, now - window_seconds)
-    redis_client.expire(key, window_seconds)
+    # queue commands
+    pipe.zadd(key, {transaction_id: now})
+    pipe.zremrangebyscrore(key, 0, now - window_seconds)
+    pipe.zcard(key)
+    pipe.expire(key, window_seconds)
 
     # count remaining tranactions
-    tx_count = redis_client.zcard(key)
+    _, _, tx_count = pipe.execute()
 
     # return anomaly
     return tx_count > max_tx
