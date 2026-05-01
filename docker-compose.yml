@@ -38,9 +38,10 @@ services:
       - "7474:7474"
       - "7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/password123
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
     volumes:
       - neo4j_data:/data
+      - ./docker/neo4j-init.cypher:/docker-entrypoint-initdb.d/init.cypher
 
 volumes:
   mongo_data:
