@@ -1,47 +1,53 @@
-from datetime import datetime, timezone, timedelta
 import random
+from datetime import datetime, timezone
 
 from app.db.mongo import transactions_collection
 
-users = [
-    "user_1",
-    "user_2",
-    "user_3",
-    "user_4",
-    "user_5"
-]
 
-locations = [
-    "Paris",
-    "London",
-    "Berlin",
-    "Madrid",
-    "Rome"
-]
+transactions_collection.delete_many({})
 
-devices = [
-    "iphone_15",
-    "samsung_s24",
-    "macbook_pro",
-    "ipad_air",
-    "windows_pc"
-]
-
-transactions = []
+sample_transactions = []
 
 for _ in range(100):
+
     transaction = {
-        "user_id": random.choice(users),
-        "amount": random.randint(10, 5000),
-        "location": random.choice(locations),
-        "device_id": random.choice(devices),
+        "sender": {
+            "account_id": f"acc_{random.randint(1,5)}",
+            "user_id": f"user_{random.randint(1,5)}",
+            "username": f"sender_{random.randint(1,5)}"
+        },
+
+        "receiver": {
+            "account_id": f"acc_{random.randint(6,10)}",
+            "user_id": f"user_{random.randint(6,10)}",
+            "username": f"receiver_{random.randint(6,10)}"
+        },
+
+        "amount": random.randint(100, 5000),
+
+        "currency": "EUR",
+
+        "device": {
+            "device_id": f"device_{random.randint(1,20)}",
+            "ip_address": f"192.168.1.{random.randint(1,255)}"
+        },
+
+        "location": {
+            "country": "France",
+            "city": "Paris"
+        },
+
+        "status": random.choice([
+            "approved",
+            "flagged",
+            "blocked"
+        ]),
+
         "timestamp": datetime.now(timezone.utc)
-        - timedelta(minutes=random.randint(0, 1440)),
-        "is_fraud": random.choice([True, False])
     }
 
-    transactions.append(transaction)
+    sample_transactions.append(transaction)
 
-transactions_collection.insert_many(transactions)
+transactions_collection.insert_many(sample_transactions)
 
 print("100 sample transactions inserted successfully.")
