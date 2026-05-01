@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
+import uuid
 from enum import Enum
 
 
@@ -36,6 +37,7 @@ class GraphSignals(BaseModel):
 
 
 class TransactionCreate(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     sender: UserInfo
     receiver: UserInfo
 
