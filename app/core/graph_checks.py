@@ -1,5 +1,5 @@
 from app.db.neo4j_client import neo4j_client
-from models.transactions import GraphSignals
+from app.models.transactions import GraphSignals
 from app.config import get_settings
 import logging
 
@@ -17,8 +17,8 @@ async def check_circular_ring(account_id):
         limit 1""", {"account_id": account_id, "max_hops": settings.GRAPH_RING_MAX_HOPS},
     )
     if rows:
-        return {"rings_detected":True, "ring_hop_count":rows[0]["hops"]}
-    return {"rings_detected": False, "ring_hop_count": 0}
+        return {"ring_detected": True, "ring_hop_count": rows[0]["hops"]}
+    return {"ring_detected": False, "ring_hop_count": 0}
 
 async def check_device_sharing(device_fingerprint):
     """how many user accs use this device?"""
@@ -36,7 +36,7 @@ async def check_ip_sharing(ip_address):
         return {"shared_ip_users":0}
     rows = await neo4j_client.run_query(
 
-        """match (ip:IPAddress {address: $ip})<-[r:LOGGED_IN_FROM]-(u:User)
+        """match (ip:IpAddress {address: $ip})<-[r:LOGGED_IN_FROM]-(u:User)
         where r.timestamp > (timestamp()-86400000)
         return count(distinct u) as user_count""",
         {"ip":ip_address})
@@ -53,7 +53,7 @@ async def check_rapid_forwarding(account_id, window_ms=3_600_000):
         order by chain_length desc limit 1""",
         {"account_id":account_id, "window_ms":window_ms}
     )
-    return {"rapid_forwarding_chain": bool(rows)}
+    return {"rapid_forward_chain": bool(rows)}
 
 async def check_trust_network(user_id):
     """how many verified users is this user connected to"""
