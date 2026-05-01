@@ -1,20 +1,37 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
-from app.db.mongo import transactions_collection
-from app.models.transactions import Transaction
-from app.services.alert_service import create_alert
-
+from app.db.mongo import (
+    transactions_collection,
+    alerts_collection
+)
 
 # CREATE TRANSACTION
 def create_transaction(data):
-    transaction = Transaction(
-        user_id=data["user_id"],
-        amount=data["amount"],
-        location=data["location"],
-        device_id=data["device_id"]
-    )
+    transaction = {
+        "sender": data["sender"],
+        "receiver": data["receiver"],
+        "amount": data["amount"],
+        "currency": data["currency"],
+        "device": data["device"],
+        "location": data["location"],
+        "status": data.get("status", "approved"),
+        "timestamp": data.get(
+            "timestamp",
+            datetime.now(timezone.utc)
+        )
+    }
 
-    result = transactions_collection.insert_one(transaction.to_dict())
+    result = transactions_collection.insert_one(transaction)
+
+    if transaction["amount"] > 10000:
+        alert = {
+            "transaction_id": str(result.inserted_id),
+            "reason": "High transaction amount",
+            "severity": "high",
+            "created_at": datetime.now(timezone.utc)
+        }
+
+        alerts_collection.insert_one(alert)
 
     return {
         "message": "Transaction created successfully",
@@ -22,37 +39,38 @@ def create_transaction(data):
     }
 
 
-# AGGREGATION 1:
-# Suspicious transaction frequency
+# AGGREGATION 1
+# Suspicious Transaction Frequency
 def suspicious_transaction_frequency():
-    one_minute_ago = datetime.now(timezone.utc) - timedelta(minutes=1)
 
     pipeline = [
-        {"$match": {"timestamp": {"$gte": one_minute_ago}}},
-        {"$group": {"_id": "$user_id", "transaction_count": {"$sum": 1}}},
-        {"$match": {"transaction_count": {"$gt": 5}}}
+        {
+            "$group": {
+                "_id": "$sender.user_id",
+                "transaction_count": {"$sum": 1}
+            }
+        },
+        {
+            "$match": {
+                "transaction_count": {"$gt": 5}
+            }
+        }
     ]
 
-    results = list(transactions_collection.aggregate(pipeline))
+    return list(
+        transactions_collection.aggregate(pipeline)
+    )
 
-    for r in results:
-        create_alert(
-            user_id=r["_id"],
-            alert_type="HIGH_FREQUENCY",
-            message="User made too many transactions in a short time",
-            severity="HIGH"
-        )
 
-    return results
-
-# AGGREGATION 2:
-# Daily spending analysis
+# AGGREGATION 2
+# Daily Spending Analysis
 def daily_spending_analysis():
+
     pipeline = [
         {
             "$group": {
                 "_id": {
-                    "user_id": "$user_id",
+                    "user_id": "$sender.user_id",
                     "date": {
                         "$dateToString": {
                             "format": "%Y-%m-%d",
@@ -60,23 +78,24 @@ def daily_spending_analysis():
                         }
                     }
                 },
-                "total_amount": {"$sum": "$amount"},
-                "transaction_count": {"$sum": 1}
+
+                "total_amount": {
+                    "$sum": "$amount"
+                },
+
+                "transaction_count": {
+                    "$sum": 1
+                }
             }
         },
+
         {
-            "$sort": {"total_amount": -1}
+            "$sort": {
+                "total_amount": -1
+            }
         }
     ]
 
-    return list(transactions_collection.aggregate(pipeline))
-
-
-# Get user history
-def get_user_transactions(user_id):
     return list(
-        transactions_collection.find(
-            {"user_id": user_id},
-            {"_id": 0}
-        )
+        transactions_collection.aggregate(pipeline)
     )
