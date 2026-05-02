@@ -1,31 +1,24 @@
 from datetime import datetime, timezone
-
+from app.core.fraud_engine import evaluate
+from app.services.ingestion_service import ingest_transaction_to_graph
+from app.models.transactions import TransactionCreate, FraudDecision
 from app.db.mongo import (
     transactions_collection,
     alerts_collection
 )
 
 # CREATE TRANSACTION
-def create_transaction(data):
-    transaction = {
-        "sender": data["sender"],
-        "receiver": data["receiver"],
-        "amount": data["amount"],
-        "currency": data["currency"],
-        "device": data["device"],
-        "location": data["location"],
-        "status": data.get("status", "approved"),
-        "timestamp": data.get(
-            "timestamp",
-            datetime.now(timezone.utc)
-        )
-    }
+async def create_transaction(data):
+    txn = await evaluate(data)
 
-    result = transactions_collection.insert_one(transaction)
+    result = transactions_collection.insert_one(
+        txn.model_dump(mode="json")
+    )
+    await ingest_transaction_to_graph(txn)
 
-    if transaction["amount"] > 10000:
+    if txn.amount > 10000:
         alert = {
-            "transaction_id": str(result.inserted_id),
+            "transaction_id": txn.id,
             "reason": "High transaction amount",
             "severity": "high",
             "created_at": datetime.now(timezone.utc)
@@ -33,9 +26,21 @@ def create_transaction(data):
 
         alerts_collection.insert_one(alert)
 
+    if txn.decision != FraudDecision.ALLOW:
+        alerts_collection.insert_one({
+            "transaction_id": txn.id,
+            "reason": f"Fraud decision: {txn.decision.value}",
+            "severity": "high" if txn.decision == FraudDecision.BLOCK else "medium",
+            "created_at": datetime.now(timezone.utc)
+        })
+
     return {
         "message": "Transaction created successfully",
-        "transaction_id": str(result.inserted_id)
+        "transaction_id": str(result.inserted_id),
+        "external_id": txn.id,
+        "risk_score": txn.risk_score,
+        "decision": txn.decision.value,
+        "graph_signals": txn.graph_signals.model_dump()
     }
 
 
