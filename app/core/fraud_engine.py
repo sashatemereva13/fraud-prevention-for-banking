@@ -34,6 +34,6 @@ async def _get_mongo_score(txn: TransactionCreate):
     return 0.0
 
 
-async def _get_redis_score(txn: TransactionCreate):
+def _get_redis_score(txn: TransactionCreate):
     # TODO: check rate-limit counters from Redis
     return 0.0
