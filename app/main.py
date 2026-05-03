@@ -7,11 +7,22 @@ from app.api.routes.users import router as users_router
 from app.api.routes.alerts import router as alerts_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.db.neo4j_client import neo4j_client
+import asyncio
+from neo4j.exceptions import ServiceUnavailable
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await neo4j_client.connect()
+    for attempt in range(10):
+        try:
+            await neo4j_client.connect()
+            break
+        except ServiceUnavailable:
+            if attempt < 9:
+                print(f"Neo4j not ready, retrying ({attempt + 1}/10)...")
+                await asyncio.sleep(3)
+            else:
+                raise
     try:
         yield
     finally:
