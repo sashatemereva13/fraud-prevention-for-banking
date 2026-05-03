@@ -1,34 +1,36 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    APP_NAME = "fraud-detection"
-    DEBUG = False
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    MONGO_URI= "mongodb://localhost:27017"
-    MONGO_DB = "fraud_db"
+    APP_NAME: str = "fraud-detection"
+    DEBUG: bool = False
 
-    REDIS_URL = "redis://localhost:6379"
+    MONGO_URI: str = "mongodb://mongodb:27017"
+    MONGO_DB: str = "fraud_db"
 
-    NEO4J_URI = "bolt://localhost:7687"
-    NEO4J_USER = "neo4j"
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
+
+    NEO4J_URI: str = "bolt://neo4j:7687"
+    NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str
 
-    NEO4J_MAX_CONNECTION_POOL= 50
-    NEO4J_CONNECTION_TIMEOUT = 30
+    NEO4J_MAX_CONNECTION_POOL: int = 50
+    NEO4J_CONNECTION_TIMEOUT: int = 30
 
-    # ── risk thresholds
-    RISK_SCORE_ALERT_THRESHOLD= 0.7
-    RISK_SCORE_BLOCK_THRESHOLD = 0.9
+    RISK_SCORE_ALERT_THRESHOLD: float = 0.7
+    RISK_SCORE_BLOCK_THRESHOLD: float = 0.9
 
-    GRAPH_RING_MAX_HOPS= 5
-    GRAPH_DEVICE_SHARE_LIMIT = 3
-
-    class Config:
-        env_file = ".env"
+    GRAPH_RING_MAX_HOPS: int = 5
+    GRAPH_DEVICE_SHARE_LIMIT: int = 3
 
 
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+@property
+def REDIS_URL(self) -> str:
+    return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}"
