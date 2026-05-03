@@ -10,11 +10,12 @@ settings = get_settings()
 async def check_circular_ring(account_id):
     """Detects money that leaved and returns to the
     same account through a chain of transfers."""
+    max_hops = int(settings.GRAPH_RING_MAX_HOPS)
     rows = await neo4j_client.run_query(
-        """match path = (a:Account {id:$account_id})
-        -[:TRANSFERRED_TO*2..$max_hops]->(a)
+        f"""match path = (a:Account {{id:$account_id}})
+        -[:TRANSFERRED_TO*2..{max_hops}]->(a)
         return length(path) as hops order by hops asc
-        limit 1""", {"account_id": account_id, "max_hops": settings.GRAPH_RING_MAX_HOPS},
+        limit 1""", {"account_id": account_id},
     )
     if rows:
         return {"ring_detected": True, "ring_hop_count": rows[0]["hops"]}
