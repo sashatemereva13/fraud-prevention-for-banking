@@ -24,7 +24,7 @@ async def evaluate(txn: TransactionCreate):
 
     logger.info(
         "Fraud evaluation | txn=%s score=%.4f decision=%s ring=%s",
-        txn.id, txn.risk_score, txn.decision, txn.graph_signals.ring_detected,
+        txn.id, txn.risk_score, txn.decision.value, txn.graph_signals.ring_detected,
     )
     return txn
 
