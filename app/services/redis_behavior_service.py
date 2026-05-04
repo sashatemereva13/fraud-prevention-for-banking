@@ -92,12 +92,8 @@ def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -
 
     now = time.time()
     anomaly = False
-    
-    # decode bytes -> string
-    if last_location:
-        last_location = last_location.decode()
 
-    if last_location and last_time:
+    if last_location is not None and last_time is not None:
         last_time = float(last_time)
 
         if location != last_location and (now - last_time < time_threshold):
