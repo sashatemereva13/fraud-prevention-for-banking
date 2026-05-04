@@ -3,6 +3,8 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     APP_NAME: str = "fraud-detection"
     APP_DEBUG: bool = False
 
@@ -27,7 +29,9 @@ class Settings(BaseSettings):
     GRAPH_RING_MAX_HOPS: int = 5
     GRAPH_DEVICE_SHARE_LIMIT: int = 3
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    @property
+    def redis_url(self) -> str:
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}"
 
 
 @lru_cache()
