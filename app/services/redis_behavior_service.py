@@ -10,6 +10,7 @@ RISK_WEIGHTS = {
     "new_device": 30,
     "geo_anomaly": 40,
     "cooldown_violation": 20,
+    "new_ip": 25,
 }
 
 SUSPICIOUS_THRESHOLD = 60
@@ -125,6 +126,19 @@ def check_cooldown(user_id: str, cooldown_seconds: int = 10) -> bool:
 
     return False
 
+# =============================
+# IP anomaly
+# ==============================
+def check_ip_anomaly(user_id: str, ip: str) -> bool:
+    key = f"user:{user_id}:ips"
+
+    is_new = not redis_client.sismember(key, ip)
+
+    redis_client.sadd(key, ip)
+    redis_client.expire(key, 60 * 60 * 24 * 7) # 7 days
+
+    return is_new
+
 # ==============================
 # RISK COMPUTATION
 # ==============================
@@ -150,6 +164,10 @@ def compute_risk(user_id: str, device: str, location: str) -> dict:
     if check_cooldown(user_id):
         score += RISK_WEIGHTS["cooldown_violation"]
         reasons.append("cooldown_violation")
+
+    if check_ip_anomaly(user_id, ip):
+        score += RISK_WEIGHTS["new_ip"]
+        reasons.append("new_ip")
 
 
     result = {
