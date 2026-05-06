@@ -1,6 +1,7 @@
 from app.models.transactions import TransactionCreate
 from app.core.graph_checks import run_all_checks
 from app.core.risk_scoring import compute_risk_score, decide
+from app.services.redis_behavior_service import compute_risk
 import logging
 from app.db.mongo import transactions_collection
 
@@ -91,4 +92,11 @@ async def _get_mongo_score(txn: TransactionCreate) -> float:
 
 async def _get_redis_score(txn: TransactionCreate):
     # TODO: check rate-limit counters from Redis
-    return 0.0
+    result = compute_risk(
+        txn.sender.user_id,
+        txn.device.device_id,
+        txn.device.ip_address
+    )
+
+    # normalise
+    return min(result["risk_score"] / 100, 1.0)

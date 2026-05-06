@@ -30,7 +30,7 @@ The system is composed of multiple specialized components:
 ### Data Flow
 
 1. Transaction is received via API
-2. Redis is queried for recent user behavior
+2. Redis is queried for recent user behavior and contributes to the final risk score
 3. Fraud engine evaluates risk:
    - rule-based checks
    - behavioral anomalies (Redis)
@@ -57,10 +57,30 @@ The system is composed of multiple specialized components:
 
 ### 🔴 Redis (Real-Time Behavior Engine)
 
-- Transaction velocity tracking (sorted sets)
-- Device tracking (sets)
-- Location tracking
-- Temporary risk state using TTL
+Redis is used for real-time fraud detection by tracking user behavior across transactions.
+
+We use multiple Redis data structures:
+
+- **Sorted Sets (`ZSET`)**
+  - Used for transaction velocity detection
+  - Stores transaction timestamps per user
+  - Enables detection of high-frequency activity within a time window
+
+- **Sets (`SET`)**
+  - Used for device tracking
+  - Stores known devices per user
+  - Detects new or suspicious devices
+
+- **Strings (Key-Value with TTL)**
+  - Used for storing recent location and last transaction time
+  - Enables detection of geographic anomalies
+  - Automatically expires to keep only recent behavior
+
+- **Cooldown Keys (TTL-based)**
+  - Prevent rapid repeated actions
+  - Helps detect bot-like or automated behavior
+
+These signals are combined into a behavioral risk score and integrated into the main fraud evaluation pipeline.
 
 ### 🟣 Neo4j (Graph Analysis)
 
@@ -99,3 +119,57 @@ pip install -r requirements.txt
 ```bash
 python run.py
 ```
+
+## 🧪 How to Use
+
+### Create a Transaction
+
+**POST /transactions**
+
+Example:
+
+```json
+{
+  "sender": { "user_id": "user_1", "account_id": "acc_1", "username": "Alice" },
+  "receiver": { "user_id": "user_2", "account_id": "acc_2", "username": "Bob" },
+  "amount": 500,
+  "currency": "EUR",
+  "device": { "device_id": "device_123", "ip_address": "192.168.1.1" },
+  "location": { "country": "FR", "city": "Paris" },
+  "timestamp": "2026-01-01T10:00:00"
+}
+```
+
+### Analyze Transaction Behavior (Redis)
+
+**POST /analyze-transaction**
+
+```json
+{
+  "user_id": "user_1",
+  "device": "device_123",
+  "location": "Paris"
+}
+```
+
+### Get Dashboard Data
+
+**GET /dashboard**
+
+Returns aggregated fraud statistics.
+
+### Get Alerts
+
+**GET /alerts**
+
+Returns all detected fraud alerts.
+
+## 🌱 Seed Data
+
+To populate the database with sample data:
+
+```bash
+python seed.py
+```
+
+This will create sample users and transactions for testing.
