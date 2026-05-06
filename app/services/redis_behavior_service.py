@@ -1,6 +1,7 @@
 import time
 from app.db.redis_client import redis_client
 import uuid
+import logging
 
 # ============================
 # CONFIGURATION
@@ -10,10 +11,12 @@ RISK_WEIGHTS = {
     "new_device": 30,
     "geo_anomaly": 40,
     "cooldown_violation": 20,
+    "new_ip": 25,
 }
 
 SUSPICIOUS_THRESHOLD = 60
 
+logger = logging.getLogger(__name__)
 
 # ==========================
 # VELOCITY CHECK
@@ -39,7 +42,7 @@ def check_velocity(user_id: str, transaction_id: str, window_seconds: int = 60, 
     pipe.zadd(key, {transaction_id: now})
     pipe.zremrangebyscore(key, 0, now - window_seconds)
     pipe.zcard(key)
-    pipe.expire(key, window_seconds)
+    pipe.expire(key, window_seconds + 5)
 
     # count remaining tranactions
     _, _, tx_count, _ = pipe.execute()
@@ -94,7 +97,15 @@ def check_geo_anomaly(user_id: str, location: str, time_threshold: int = 3600) -
     anomaly = False
 
     if last_location is not None and last_time is not None:
-        last_time = float(last_time)
+
+
+        if isinstance(last_location, bytes):
+            last_location = last_location.decode()
+
+        try:
+            last_time = float(last_time)
+        except (TypeError, ValueError):
+            last_time = 0
 
         if location != last_location and (now - last_time < time_threshold):
             anomaly = True
@@ -125,10 +136,23 @@ def check_cooldown(user_id: str, cooldown_seconds: int = 10) -> bool:
 
     return False
 
+# =============================
+# IP anomaly
+# ==============================
+def check_ip_anomaly(user_id: str, ip: str) -> bool:
+    key = f"user:{user_id}:ips"
+
+    is_new = not redis_client.sismember(key, ip)
+
+    redis_client.sadd(key, ip)
+    redis_client.expire(key, 60 * 60 * 24 * 7) # 7 days
+
+    return is_new
+
 # ==============================
 # RISK COMPUTATION
 # ==============================
-def compute_risk(user_id: str, device: str, location: str) -> dict:
+def compute_risk(user_id: str, device: str, location: str, ip: str) -> dict:
     score = 0
     reasons = []
 
@@ -138,18 +162,27 @@ def compute_risk(user_id: str, device: str, location: str) -> dict:
     if check_velocity(user_id, transaction_id):
         score += RISK_WEIGHTS["velocity"]
         reasons.append("high_velocity")
+        logger.debug("Velocity anomaly detected | user=%s", user_id)
 
     if check_new_device(user_id, device):
         score += RISK_WEIGHTS["new_device"]
         reasons.append("new_device")
+        logger.debug("New device detected | user=%s device=%s", user_id, device)
 
     if check_geo_anomaly(user_id, location):
         score += RISK_WEIGHTS["geo_anomaly"]
         reasons.append("geo_anomaly")
+        logger.debug("Geo anomaly detected | user=%s location=%s", user_id, location)
 
     if check_cooldown(user_id):
         score += RISK_WEIGHTS["cooldown_violation"]
         reasons.append("cooldown_violation")
+        logger.debug("Cooldown violation | user=%s", user_id)
+
+    if check_ip_anomaly(user_id, ip):
+        score += RISK_WEIGHTS["new_ip"]
+        reasons.append("new_ip")
+        logger.debug("New IP detected | user=%s ip=%s", user_id, ip)
 
 
     result = {
@@ -158,7 +191,22 @@ def compute_risk(user_id: str, device: str, location: str) -> dict:
         "is_suspicious": score >= SUSPICIOUS_THRESHOLD
     }
     
-    print(f"[RISK] user={user_id}, score={score}, reasons={reasons}")
+
+    if result["is_suspicious"]:
+        logger.warning(
+            "Redis risk HIGH | user=%s txn=%s score=%s reasons=%s",
+            user_id,
+            transaction_id,
+            score,
+            reasons
+        )
+    else:
+        logger.info(
+            "Redis risk | user=%s txn=%s score=%s",
+            user_id,
+            transaction_id,
+            score
+        )
 
     return result
 

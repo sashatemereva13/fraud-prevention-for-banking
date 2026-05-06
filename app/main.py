@@ -10,7 +10,7 @@ from app.db.neo4j_client import neo4j_client
 import asyncio
 from neo4j.exceptions import ServiceUnavailable
 
-
+# retry logic to handle service startup delays
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     for attempt in range(10):
