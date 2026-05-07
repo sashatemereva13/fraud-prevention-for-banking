@@ -14,9 +14,9 @@ It processes transactions in real time and evaluates risk using:
 
 Each transaction is assigned a dynamic risk score and classified as:
 
-- approved
-- flagged
-- blocked
+- allow
+- review
+- block
 
 ## 🏗️ Architecture
 
@@ -84,14 +84,49 @@ These signals are combined into a behavioral risk score and integrated into the 
 
 ### 🟣 Neo4j (Graph Analysis)
 
-- Detects transaction loops (money laundering)
-- Identifies suspicious clusters
-- Analyzes relationships between users
+Neo4j is used to model relationships that are difficult to detect from a single transaction row. Instead of only storing transactions as documents, the system builds a graph of users, accounts, devices, IP addresses, and money transfers.
+
+Main graph entities:
+
+- `User`
+- `Account`
+- `Device`
+- `IpAddress`
+
+Main relationships:
+
+- `(User)-[:OWNS]->(Account)`
+- `(User)-[:USES]->(Device)`
+- `(User)-[:LOGGED_IN_FROM]->(IpAddress)`
+- `(Account)-[:TRANSFERRED_TO]->(Account)`
+
+The Neo4j module detects:
+
+- Circular transfer rings, where money returns to the same account through a chain of transfers
+- Shared devices used by many different users
+- Shared IP addresses used by many users in a short time window
+- Rapid forwarding chains, where money moves quickly through several accounts
+- Weak trust networks, where a user has no verified trusted connections
+
+Script files:
+
+- `scripts/test_live.py` - seeds Neo4j fraud patterns and runs live API checks
+- `scripts/test_full_pipeline.py` - full demo showing Neo4j, MongoDB, and Redis working together
 
 ### 🧠 Fraud Engine
 
 - Combines multiple signals into a risk score
-- Classifies transactions as approved / flagged / blocked
+- Classifies transactions as allow / review / block
+
+The main orchestration happens in `app/core/fraud_engine.py`.
+
+For each transaction:
+
+1. Neo4j graph checks are executed through `run_all_checks(...)`
+2. MongoDB history is checked for previous suspicious behavior and amount anomalies
+3. Redis behavior checks are used for real-time signals such as velocity, new device, new IP, and cooldown
+4. `app/core/risk_scoring.py` combines the subscores into one final risk score
+5. The transaction is classified as `allow`, `review`, or `block`
 
 ## ▶️ How to Run
 
@@ -102,22 +137,39 @@ git clone <repo-url>
 cd fraud-detection-system
 ```
 
-### 2. Start services
+### 2. Configure environment
+
+Create a `.env` file from the example and set the Neo4j password:
 
 ```bash
-docker compose up -d
+cp .env.example .env
 ```
 
-### 3. Install dependencies
+Example:
+
+```env
+NEO4J_PASSWORD=your_password_here
+```
+
+### 3. Start services
+
+Docker Compose starts MongoDB, Redis, Neo4j, and the FastAPI application.
 
 ```bash
+docker compose up -d --build
+```
+
+The API is then available at:
+
+- `http://localhost:8000`
+- `http://localhost:8000/docs`
+
+If you prefer running the API locally instead of inside Docker, start only the databases and then run the app:
+
+```bash
+docker compose up -d mongodb redis neo4j
 pip install -r requirements.txt
-```
-
-### 4. Run the API
-
-```bash
-python run.py
+python3 run.py
 ```
 
 ## 🧪 How to Use
@@ -140,6 +192,8 @@ Example:
 }
 ```
 
+You can also test the Redis behavior engine directly:
+
 ### Analyze Transaction Behavior (Redis)
 
 **POST /analyze-transaction**
@@ -148,7 +202,8 @@ Example:
 {
   "user_id": "user_1",
   "device": "device_123",
-  "location": "Paris"
+  "location": "France:Paris",
+  "ip_address": "192.168.1.1"
 }
 ```
 
@@ -164,12 +219,93 @@ Returns aggregated fraud statistics.
 
 Returns all detected fraud alerts.
 
-## 🌱 Seed Data
+## 🧪 Live Tests And Demo Scripts
 
-To populate the database with sample data:
+Make sure Docker services and the API are running before using the live scripts:
 
 ```bash
-python seed.py
+docker compose up -d --build
 ```
 
-This will create sample users and transactions for testing.
+### Full Pipeline Demo
+
+This is the recommended professor demo because it shows all three databases contributing to fraud detection.
+
+```bash
+python3 scripts/test_full_pipeline.py
+```
+
+It demonstrates:
+
+- Neo4j graph fraud detection
+- MongoDB transaction history scoring
+- Redis real-time behavior scoring
+- A clean transaction used as a control case
+
+### Neo4j-Focused Live Test
+
+This script seeds Neo4j with graph fraud patterns, then sends transactions to the API.
+
+```bash
+python3 scripts/test_live.py
+```
+
+It demonstrates:
+
+- Circular transfer ring detection
+- Shared device detection
+- Shared IP detection
+- Redis velocity behavior
+- Clean transaction comparison
+
+### Neo4j Graph Simulation Helper
+
+This helper creates graph structures directly in Neo4j for manual testing.
+
+```bash
+python3 scripts/simulate_fraud.py
+```
+
+It creates:
+
+- A circular transfer ring
+- A rapid forwarding chain
+
+After running it, the printed account IDs can be checked through the API endpoints.
+
+## 🔎 Neo4j API Checks
+
+Inspect whether an account is part of a circular transfer ring:
+
+```http
+GET /transactions/graph/ring/{account_id}
+```
+
+Inspect how many users share a device fingerprint:
+
+```http
+GET /transactions/graph/device/{fingerprint}
+```
+
+Example:
+
+```bash
+curl http://localhost:8000/transactions/graph/ring/acc-ring-A
+curl http://localhost:8000/transactions/graph/device/SHARED-DEVICE-001
+```
+
+## 🌱 Seed Data
+
+Seed sample Neo4j users and devices:
+
+```bash
+python3 scripts/seed_users.py
+```
+
+Seed sample MongoDB transactions:
+
+```bash
+python3 scripts/seed_transactions.py
+```
+
+Note: `scripts/seed_transactions.py` clears the MongoDB transactions collection before inserting sample data.
