@@ -9,10 +9,11 @@ class TransactionRequest(BaseModel):
     user_id: str
     device: str
     location: str
+    ip_address: str
 
 @router.post("/analyze-transaction")
 def analyse_transaction(req: TransactionRequest):
-    return compute_risk(req.user_id, req.device, req.location)
+    return compute_risk(req.user_id, req.device, req.location, req.ip_address)
 
 from app.models.transactions import TransactionCreate
 

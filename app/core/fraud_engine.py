@@ -90,8 +90,7 @@ async def _get_mongo_score(txn: TransactionCreate) -> float:
 
         return 0.0
 
-
-async def _get_redis_score(txn: TransactionCreate):
+def _get_redis_score(txn: TransactionCreate):
     # TODO: check rate-limit counters from Redis
     result = compute_risk(
         txn.sender.user_id,
