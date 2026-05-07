@@ -95,8 +95,9 @@ def _get_redis_score(txn: TransactionCreate):
     result = compute_risk(
         txn.sender.user_id,
         txn.device.device_id,
+        f"{txn.location.country}:{txn.location.city}",
         txn.device.ip_address
     )
 
     # normalise
-    return min(result["risk_score"] / 100, 1.0)
+    return min(result["risk_score"] / 140, 1.0)

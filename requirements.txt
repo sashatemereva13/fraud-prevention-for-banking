@@ -11,3 +11,5 @@ redis
 neo4j
 
 python-dotenv
+
+email-validator
