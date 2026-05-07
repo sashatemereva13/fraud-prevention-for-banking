@@ -309,3 +309,137 @@ python3 scripts/seed_transactions.py
 ```
 
 Note: `scripts/seed_transactions.py` clears the MongoDB transactions collection before inserting sample data.
+
+## 🔵 MongoDB (Persistence & Aggregation Analysis)
+
+MongoDB is used as the primary document database for persistent transaction storage in the fraud detection system.
+
+A document-oriented database was chosen because financial transactions contain nested and flexible data structures such as:
+
+- sender information
+- receiver information
+- device metadata
+- location data
+- fraud analysis results
+
+MongoDB allows these complex transaction objects to be stored naturally as JSON-like documents without requiring rigid relational schemas.
+
+Main MongoDB collections:
+
+- `transactions`
+- `users`
+- `fraud_alerts`
+
+Example transaction document:
+
+```json
+{
+  "id": "txn_001",
+  "sender": {
+    "account_id": "acc_001",
+    "user_id": "user_001",
+    "username": "alice"
+  },
+  "receiver": {
+    "account_id": "acc_002",
+    "user_id": "user_002",
+    "username": "bob"
+  },
+  "amount": 500,
+  "currency": "EUR",
+  "device": {
+    "device_id": "dev_001",
+    "ip_address": "192.168.1.10"
+  },
+  "location": {
+    "country": "France",
+    "city": "Paris"
+  },
+  "status": "approved",
+  "timestamp": "2026-05-07T12:00:00Z",
+  "risk_score": 25,
+  "decision": "allow"
+}
+````
+
+MongoDB is also used for analytical fraud detection using aggregation pipelines.
+
+### Aggregation Pipeline 1 — Suspicious Transaction Frequency
+
+Function:
+
+```python
+suspicious_transaction_frequency()
+```
+
+Purpose:
+
+This aggregation groups transactions by sender account and counts how many transactions each account performs within a period of time.
+
+It helps identify:
+
+* unusually active accounts
+* bot-like transaction behavior
+* potential fraud rings
+* high-frequency suspicious transfers
+
+Example pipeline stages:
+
+* `$group`
+* `$sum`
+* `$match`
+* `$sort`
+
+### Aggregation Pipeline 2 — Daily Spending Analysis
+
+Function:
+
+```python
+daily_spending_analysis()
+```
+
+Purpose:
+
+This aggregation calculates:
+
+* total transaction amount per day
+* number of transactions per day
+
+It helps detect:
+
+* abnormal spending spikes
+* sudden increases in transaction activity
+* suspicious financial patterns
+
+Example pipeline stages:
+
+* `$group`
+* `$project`
+* `$sum`
+* `$sort`
+
+Testing was performed using:
+
+```bash
+python -m tests.test_aggregation
+```
+
+Example output:
+
+```bash
+Daily Spending Analysis:
+
+{'_id': {'date': None}, 'total_amount': 1150, 'transaction_count': 3}
+```
+
+MongoDB functionality was verified through:
+
+* Docker container deployment
+* MongoDB Compass inspection
+* Manual transaction insertion
+* Aggregation pipeline execution
+* API-based transaction storage
+
+MongoDB provides scalable document storage together with flexible aggregation capabilities for fraud analytics and historical transaction analysis.
+
+
